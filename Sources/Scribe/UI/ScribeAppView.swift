@@ -712,6 +712,15 @@ private struct MeetingDetail: View {
                     model.regenerateSelectedNote()
                 }
                 .disabled(meeting.isDemo || !meeting.hasTranscript || meeting.state == "recording" || model.regeneratingMeetingID != nil)
+                Menu("Transcribe Again With", systemImage: "waveform") {
+                    ForEach(TranscriptionChoice.all, id: \.title) { choice in
+                        Button(choice.model.isInstalled ? choice.title : "\(choice.title) (not downloaded)") {
+                            model.retranscribeSelectedMeeting(with: choice)
+                        }
+                        .disabled(!choice.model.isInstalled)
+                    }
+                }
+                .disabled(meeting.isDemo || meeting.state == "recording")
                 Button("Export Markdown…", systemImage: "square.and.arrow.down") {
                     model.exportSelectedMeeting()
                 }

@@ -311,6 +311,10 @@ final class AppController {
                 else { await self.transcription.resumePending(root: self.root) }
             }
         }
+        model.onRetranscribe = { [weak self] directory, choice in
+            guard let self else { return }
+            Task { await self.transcription.retranscribe(directory, with: choice) }
+        }
         model.audioSetup.canStart = { [weak self] in self?.session == nil && self?.isStarting == false }
         model.onDownloadTranscriptionModel = { selected in
             self.downloadTranscriptionModel(selected)

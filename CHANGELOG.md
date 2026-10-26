@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add **Transcribe Again With** to a meeting's ⋯ menu to redo its transcript
+  with another installed model or spoken language. Track speaker names are
+  kept; per-line speaker corrections are cleared because the lines change.
+  Notes are not touched, so choose Refresh notes afterward to update the summary.
 - Add Whisper Filipino, a local transcription model for Tagalog, Filipino, and
   Taglish meetings, with a Spoken language choice (Filipino, English, or
   automatic detection). Download it from Settings → Models or with

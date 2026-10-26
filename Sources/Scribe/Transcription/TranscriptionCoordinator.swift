@@ -14,25 +14,48 @@ actor TranscriptionCoordinator {
         case failed(session: String)
     }
 
-    private var queue: [URL] = []
+    /// A queued session. `choice` is set when the user asked to transcribe a
+    /// finished meeting again with a specific model; nil uses Settings.
+    private struct Job: Sendable {
+        let directory: URL
+        let choice: TranscriptionChoice?
+    }
+
+    enum RetranscriptionError: Error, CustomStringConvertible {
+        case noSpeech
+
+        var description: String {
+            switch self {
+            case .noSpeech: return "no speech recognized; kept the existing transcript"
+            }
+        }
+    }
+
+    private var queue: [Job] = []
     private var draining = false
     private var activeDirectory: URL?
     private var engine: TranscriptionEngine?
+    private var engineChoice: TranscriptionChoice?
     private var lastFailure: String?
     private var statusHandler: (@Sendable (Status) -> Void)?
     private let makeEngine: @Sendable () -> any TranscriptionEngine
+    private let makeChosenEngine: @Sendable (TranscriptionChoice) -> any TranscriptionEngine
 
-    init(makeEngine: @escaping @Sendable () -> any TranscriptionEngine = { LocalTranscriptionModel.selected.makeEngine() }) {
+    init(
+        makeEngine: @escaping @Sendable () -> any TranscriptionEngine = { LocalTranscriptionModel.selected.makeEngine() },
+        makeChosenEngine: @escaping @Sendable (TranscriptionChoice) -> any TranscriptionEngine = { $0.model.makeEngine(language: $0.language) }
+    ) {
         self.makeEngine = makeEngine
+        self.makeChosenEngine = makeChosenEngine
     }
 
     func setStatusHandler(_ handler: @escaping @Sendable (Status) -> Void) {
         statusHandler = handler
     }
 
-    func processNow(_ sessionDir: URL) async throws {
+    func processNow(_ sessionDir: URL, choice: TranscriptionChoice? = nil) async throws {
         do {
-            try await transcribe(sessionDir)
+            try await transcribe(sessionDir, choice: choice)
             await releaseEngine()
         } catch {
             log(sessionDir, "transcription failed: \(error)")
@@ -44,15 +67,30 @@ actor TranscriptionCoordinator {
     private func releaseEngine() async {
         await engine?.release()
         engine = nil
+        engineChoice = nil
     }
 
     /// Queue a finished session. With transcription disabled, the local audio
     /// and metadata remain available and no post-processing process is run.
     func enqueue(_ sessionDir: URL) {
         guard Config.transcriptionEnabled() else { return }
-        guard activeDirectory != sessionDir, !queue.contains(sessionDir) else { return }
-        queue.append(sessionDir)
+        guard activeDirectory != sessionDir, !isQueued(sessionDir) else { return }
+        queue.append(Job(directory: sessionDir, choice: nil))
         drainIfIdle()
+    }
+
+    /// Replace a finished meeting's transcript using the chosen model and
+    /// language. Notes are left alone so a summary from a connected AI is
+    /// never overwritten; the user refreshes them when ready.
+    func retranscribe(_ sessionDir: URL, with choice: TranscriptionChoice) {
+        guard activeDirectory != sessionDir else { return }
+        queue.removeAll { $0.directory == sessionDir }
+        queue.append(Job(directory: sessionDir, choice: choice))
+        drainIfIdle()
+    }
+
+    private func isQueued(_ dir: URL) -> Bool {
+        queue.contains { $0.directory == dir }
     }
 
     /// Scan the recordings root for sessions that finished (meta.json exists)
@@ -71,8 +109,8 @@ actor TranscriptionCoordinator {
                     && !fm.fileExists(atPath: $0.appendingPathComponent("transcript.json").path)
             }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-        for dir in pending where !queue.contains(dir) && activeDirectory != dir {
-            queue.append(dir)
+        for dir in pending where !isQueued(dir) && activeDirectory != dir {
+            queue.append(Job(directory: dir, choice: nil))
         }
         if !pending.isEmpty {
             FileHandle.standardError.write(Data(
@@ -122,11 +160,12 @@ actor TranscriptionCoordinator {
 
     private func drain() async {
         while !queue.isEmpty {
-            let dir = queue.removeFirst()
+            let job = queue.removeFirst()
+            let dir = job.directory
             activeDirectory = dir
             publish(.transcribing(session: dir.lastPathComponent, queued: queue.count))
             do {
-                try await transcribe(dir)
+                try await transcribe(dir, choice: job.choice)
                 notifyUser(title: "Scribe — transcript ready", body: dir.lastPathComponent)
             } catch {
                 log(dir, "transcription failed: \(error)")
@@ -138,8 +177,7 @@ actor TranscriptionCoordinator {
             }
         }
         activeDirectory = nil
-        await engine?.release()
-        engine = nil
+        await releaseEngine()
         publish(lastFailure.map { .failed(session: $0) } ?? .idle)
         draining = false
         // An enqueue that landed between the loop exiting and the release
@@ -147,10 +185,11 @@ actor TranscriptionCoordinator {
         drainIfIdle()
     }
 
-    private func transcribe(_ dir: URL) async throws {
-        log(dir, "starting transcription — loading local model")
+    private func transcribe(_ dir: URL, choice: TranscriptionChoice? = nil) async throws {
+        log(dir, choice.map { "transcribing again with \($0.model.rawValue) (\($0.language.rawValue)) — loading local model" }
+            ?? "starting transcription — loading local model")
         let meta = try SessionMeta.read(from: dir)
-        let engine = try await preparedEngine()
+        let engine = try await preparedEngine(for: choice)
 
         var merged: [Transcript.Segment] = []
         for track in meta.tracks {
@@ -181,6 +220,8 @@ actor TranscriptionCoordinator {
         }
         merged.sort { $0.start_ms < $1.start_ms }
         merged = TranscriptEchoDeduplicator.removingCrossTrackEcho(from: merged)
+        // Never trade a usable transcript for an empty one.
+        if choice != nil && merged.isEmpty { throw RetranscriptionError.noSpeech }
 
         let transcript = Transcript(
             engine: engine.name,
@@ -188,18 +229,33 @@ actor TranscriptionCoordinator {
             created_at: ISO8601DateFormatter().string(from: Date()),
             segments: merged
         )
+        if choice != nil {
+            // Per-line speaker corrections are keyed by line index, which no
+            // longer lines up with the new segments. Track names still apply.
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent("speaker-overrides.json"))
+        }
         try transcript.writeMarkdown(to: dir)
-        let markdown = try String(
-            contentsOf: dir.appendingPathComponent("transcript.md"),
-            encoding: .utf8
-        )
-        try await NotePipeline.generate(sessionDir: dir, transcriptMarkdown: markdown)
+        if choice == nil {
+            let markdown = try String(
+                contentsOf: dir.appendingPathComponent("transcript.md"),
+                encoding: .utf8
+            )
+            try await NotePipeline.generate(sessionDir: dir, transcriptMarkdown: markdown)
+        }
         try transcript.writeCompletionMarker(to: dir)
         log(dir, "done — \(merged.count) segments")
     }
 
-    private func preparedEngine() async throws -> TranscriptionEngine {
-        if let engine { return engine }
+    private func preparedEngine(for choice: TranscriptionChoice?) async throws -> TranscriptionEngine {
+        if let engine, engineChoice == choice { return engine }
+        await releaseEngine()
+        if let choice {
+            let engine = makeChosenEngine(choice)
+            try await engine.prepare()
+            self.engine = engine
+            engineChoice = choice
+            return engine
+        }
         let configured = Config.transcriptionEngine()
         let engine = makeEngine()
         if configured != engine.name {
