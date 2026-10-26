@@ -35,7 +35,9 @@ actor ParakeetEngine: TranscriptionEngine {
 
     func prepare() async throws {
         guard manager == nil else { return }
-        let version = selectedModel.fluidVersion
+        guard let version = selectedModel.fluidVersion else {
+            throw EngineError.modelMissing(AsrModels.defaultCacheDirectory())
+        }
         let cache = AsrModels.defaultCacheDirectory(for: version)
         guard AsrModels.modelsExist(at: cache, version: version) else {
             throw EngineError.modelMissing(cache)

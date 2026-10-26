@@ -493,12 +493,33 @@ struct ScribeModelManagerView: View {
                 ForEach(LocalTranscriptionModel.allCases) { item in
                     modelCard(item)
                 }
+                if model.transcriptionModel == .filipino {
+                    HStack {
+                        Text("Spoken language")
+                            .font(ScribeTheme.sans(12, weight: .medium))
+                            .foregroundStyle(ScribeTheme.ink)
+                        Spacer()
+                        Picker("Spoken language", selection: Binding(
+                            get: { model.transcriptionLanguage },
+                            set: { model.setTranscriptionLanguage($0) }
+                        )) {
+                            ForEach(TranscriptionLanguage.allCases) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 200)
+                        .scribePointer()
+                    }
+                    Text("Filipino keeps English words in Taglish. Choose Detect automatically for meetings in other languages.")
+                        .font(ScribeTheme.sans(10))
+                        .foregroundStyle(ScribeTheme.faintInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "lock.shield")
                         .foregroundStyle(ScribeTheme.coral)
                         .frame(width: 20)
-                    Text("Models come from FluidInference on Hugging Face. After download, audio and transcripts remain local. Scribe never downloads a model without your click.")
+                    Text("Models come from FluidInference and Argmax on Hugging Face. After download, audio and transcripts remain local. Scribe never downloads a model without your click.")
                         .font(ScribeTheme.sans(10))
                         .foregroundStyle(ScribeTheme.mutedInk)
                         .fixedSize(horizontal: false, vertical: true)
@@ -508,8 +529,17 @@ struct ScribeModelManagerView: View {
             }
             .padding(24)
         }
-        .frame(width: 610, height: model.modelDownloadError != nil || model.downloadingModelID != nil ? 620 : 490)
+        .frame(width: 610, height: (model.modelDownloadError != nil || model.downloadingModelID != nil ? 720 : 590) + (model.transcriptionModel == .filipino ? 60 : 0))
         .background(ScribeTheme.paper)
+    }
+
+    private static func symbol(for item: LocalTranscriptionModel) -> String {
+        switch item {
+        case .english: return "text.badge.checkmark"
+        case .multilingual: return "globe"
+        case .compact: return "hare"
+        case .filipino: return "character.bubble"
+        }
     }
 
     private func modelCard(_ item: LocalTranscriptionModel) -> some View {
@@ -517,7 +547,7 @@ struct ScribeModelManagerView: View {
         let selected = model.transcriptionModel == item
         let downloading = model.downloadingModelID == item.id
         return HStack(alignment: .center, spacing: 14) {
-            Image(systemName: item == .compact ? "hare" : item == .multilingual ? "globe" : "text.badge.checkmark")
+            Image(systemName: Self.symbol(for: item))
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(selected ? ScribeTheme.coral : ScribeTheme.ink)
                 .frame(width: 30, height: 30)
