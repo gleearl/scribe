@@ -641,6 +641,7 @@ final class ScribeAppModel: ObservableObject {
     let audioSetup = AudioSetupTest()
     var onCancelModelDownload: (() -> Void)?
     var onRetryTranscription: ((URL?) -> Void)?
+    var onRetranscribe: ((URL, TranscriptionChoice) -> Void)?
     @Published var showAssistant = false
     @Published var showAISettings = false
     @Published var showOrganizer = false
@@ -1036,6 +1037,18 @@ final class ScribeAppModel: ObservableObject {
         } catch {
             alertMessage = "Scribe couldn’t move this meeting to Trash: \(error.localizedDescription)"
         }
+    }
+
+    /// Replace the selected meeting's transcript using another installed
+    /// model or language. Notes stay as they are until the user refreshes them.
+    func retranscribeSelectedMeeting(with choice: TranscriptionChoice) {
+        guard let meeting = selectedMeeting,
+              !meeting.isDemo,
+              meeting.state != "recording",
+              choice.model.isInstalled
+        else { return }
+        onRetranscribe?(meeting.directory, choice)
+        showNotice("Transcribing again with \(choice.title). Refresh notes afterward to update the summary.")
     }
 
     func regenerateSelectedNote() {

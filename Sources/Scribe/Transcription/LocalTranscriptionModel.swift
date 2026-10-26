@@ -68,8 +68,10 @@ enum LocalTranscriptionModel: String, CaseIterable, Codable, Identifiable, Senda
         return AsrModels.modelsExist(at: cache, version: fluidVersion)
     }
 
-    func makeEngine() -> any TranscriptionEngine {
-        fluidVersion == nil ? WhisperEngine(model: self) : ParakeetEngine(model: self)
+    func makeEngine(language: TranscriptionLanguage = .selected) -> any TranscriptionEngine {
+        fluidVersion == nil
+            ? WhisperEngine(model: self, language: language)
+            : ParakeetEngine(model: self)
     }
 
     static var selected: LocalTranscriptionModel {
@@ -103,5 +105,23 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable, Sendable {
 
     static var selected: TranscriptionLanguage {
         Config.transcriptionLanguage().flatMap(TranscriptionLanguage.init(rawValue:)) ?? .filipino
+    }
+}
+
+/// A model and spoken language picked for one meeting, overriding Settings.
+struct TranscriptionChoice: Equatable, Sendable {
+    let model: LocalTranscriptionModel
+    let language: TranscriptionLanguage
+
+    /// Every option offered by "Transcribe again with": each Parakeet model
+    /// once, and Whisper once per spoken language.
+    static let all: [TranscriptionChoice] = LocalTranscriptionModel.allCases.flatMap { model in
+        model.fluidVersion == nil
+            ? TranscriptionLanguage.allCases.map { TranscriptionChoice(model: model, language: $0) }
+            : [TranscriptionChoice(model: model, language: .auto)]
+    }
+
+    var title: String {
+        model.fluidVersion == nil ? "\(model.title) · \(language.title)" : model.title
     }
 }

@@ -141,6 +141,10 @@ explicitly from Terminal:
 scribe models download-transcription --model parakeet-v2
 ```
 
+To redo one meeting with a different model or language, open its ⋯ menu and
+choose **Transcribe Again With**. Only the transcript is replaced; choose
+**Refresh notes** afterward to update the summary.
+
 For Tagalog, Filipino, and Taglish meetings, choose **Whisper Filipino**, which
 is Whisper large-v3 turbo running locally through WhisperKit. When it is
 selected, Settings shows a **Spoken language** choice: Filipino (the default),
