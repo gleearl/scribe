@@ -241,6 +241,7 @@ private struct MeetingSidebar: View {
                                 MeetingSidebarRow(
                                     meeting: meeting,
                                     selected: model.selectedMeetingID == meeting.id,
+                                    transcribing: model.transcriptionProgress?.session == meeting.directory.lastPathComponent,
                                     onRename: {
                                         model.selectedMeetingID = meeting.id
                                         model.showRenameEditor = true
@@ -313,6 +314,7 @@ private struct MeetingSidebar: View {
 private struct MeetingSidebarRow: View {
     let meeting: MeetingRecord
     let selected: Bool
+    let transcribing: Bool
     let onRename: () -> Void
     let onDelete: () -> Void
     let action: () -> Void
@@ -345,6 +347,10 @@ private struct MeetingSidebarRow: View {
                     Circle()
                         .fill(ScribeTheme.coral)
                         .frame(width: 8, height: 8)
+                } else if transcribing {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .accessibilityLabel("Transcribing")
                 } else if meeting.hasTranscript {
                     Image(systemName: "checkmark.circle")
                         .foregroundStyle(ScribeTheme.ink)
@@ -892,6 +898,14 @@ private struct MeetingDetail: View {
         }
     }
 
+    /// Progress for this meeting while the queue is transcribing it.
+    private var activeTranscription: TranscriptionProgress? {
+        guard let progress = model.transcriptionProgress,
+              progress.session == meeting.directory.lastPathComponent
+        else { return nil }
+        return progress
+    }
+
     private var transcriptSection: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
@@ -911,7 +925,10 @@ private struct MeetingDetail: View {
                     .accessibilityHint("Opens controls for naming tracks and correcting individual moments")
                 }
             }
-            if meeting.transcript.isEmpty {
+            if let progress = activeTranscription {
+                TranscriptionProgressBanner(progress: progress)
+            }
+            if meeting.transcript.isEmpty && activeTranscription == nil {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(meeting.state == "recording" ? "The transcript will be created after you stop recording." : model.transcriptionStatus ?? "Audio saved. Create a transcript when you’re ready.")
                         .font(ScribeTheme.sans(13)).foregroundStyle(ScribeTheme.mutedInk)
@@ -922,7 +939,7 @@ private struct MeetingDetail: View {
                         }.buttonStyle(ScribeSecondaryButtonStyle())
                     }
                 }
-            } else {
+            } else if !meeting.transcript.isEmpty {
                 VStack(alignment: .leading, spacing: 9) {
                     ForEach(visibleTranscript) { line in
                         HStack(alignment: .firstTextBaseline, spacing: 12) {

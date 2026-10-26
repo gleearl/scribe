@@ -588,12 +588,14 @@ final class AppController {
         case .idle:
             menuBar.updateTranscription(nil)
             model.transcriptionStatus = nil
+            model.transcriptionProgress = nil
             model.refresh()
-        case .transcribing(_, let queued):
-            let text = queued > 0 ? "Transcribing · \(queued) queued" : "Transcribing locally"
-            menuBar.updateTranscription(text.lowercased())
-            model.transcriptionStatus = text
+        case .transcribing(let progress):
+            menuBar.updateTranscription(progress.summary.lowercased())
+            model.transcriptionStatus = progress.summary
+            model.transcriptionProgress = progress
         case .failed(let name):
+            model.transcriptionProgress = nil
             menuBar.updateTranscription("transcription failed · \(name)")
             model.transcriptionStatus = "Transcription needs attention — open the meeting to retry"
             model.refresh()

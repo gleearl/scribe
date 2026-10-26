@@ -254,3 +254,40 @@ struct ModelDownloadStatus: View {
         }
     }
 }
+
+/// Spinner, stage, and elapsed time for the meeting being transcribed.
+struct TranscriptionProgressBanner: View {
+    let progress: TranscriptionProgress
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let elapsed = context.date.timeIntervalSince(progress.startedAt)
+            HStack(alignment: .top, spacing: 10) {
+                ProgressView().controlSize(.small)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(progress.headline)
+                        .font(ScribeTheme.sans(12, weight: .semibold))
+                        .foregroundStyle(ScribeTheme.ink)
+                    Text("\(progress.stageText) · \(TranscriptionProgress.elapsedText(elapsed))")
+                        .font(ScribeTheme.sans(11))
+                        .foregroundStyle(ScribeTheme.mutedInk)
+                    if let hint = progress.hint(elapsed: elapsed) {
+                        Text(hint)
+                            .font(ScribeTheme.sans(10))
+                            .foregroundStyle(ScribeTheme.faintInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(ScribeTheme.surface.opacity(0.68))
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(ScribeTheme.divider, lineWidth: 1)
+            )
+            .accessibilityElement(children: .combine)
+        }
+    }
+}

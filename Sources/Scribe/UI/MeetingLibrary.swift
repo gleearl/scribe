@@ -625,6 +625,7 @@ final class ScribeAppModel: ObservableObject {
     @Published var recordingStartDetail = "Checking microphone and system-audio access."
     @Published var recordingElapsed = "0:00"
     @Published var transcriptionStatus: String?
+    @Published var transcriptionProgress: TranscriptionProgress?
     @Published var showSettings = false
     @Published var showModelManager = false
     @Published var showOnboarding = false
