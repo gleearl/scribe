@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Show transcription progress: the meeting being transcribed gets a banner with
+  the current step (loading the model, your microphone, call audio, writing
+  notes) and elapsed time, its sidebar row shows a spinner, and the toolbar and
+  menu bar name the current step. Slow first-time model loads explain the wait.
 - Add **Transcribe Again With** to a meeting's ⋯ menu to redo its transcript
   with another installed model or spoken language. Track speaker names are
   kept; per-line speaker corrections are cleared because the lines change.

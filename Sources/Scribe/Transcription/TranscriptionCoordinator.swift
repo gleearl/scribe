@@ -10,7 +10,7 @@ import Foundation
 actor TranscriptionCoordinator {
     enum Status: Sendable {
         case idle
-        case transcribing(session: String, queued: Int)
+        case transcribing(TranscriptionProgress)
         case failed(session: String)
     }
 
@@ -34,6 +34,7 @@ actor TranscriptionCoordinator {
     private var queue: [Job] = []
     private var draining = false
     private var activeDirectory: URL?
+    private var progress: TranscriptionProgress?
     private var engine: TranscriptionEngine?
     private var engineChoice: TranscriptionChoice?
     private var lastFailure: String?
@@ -76,6 +77,7 @@ actor TranscriptionCoordinator {
         guard Config.transcriptionEnabled() else { return }
         guard activeDirectory != sessionDir, !isQueued(sessionDir) else { return }
         queue.append(Job(directory: sessionDir, choice: nil))
+        publishProgress()
         drainIfIdle()
     }
 
@@ -86,6 +88,7 @@ actor TranscriptionCoordinator {
         guard activeDirectory != sessionDir else { return }
         queue.removeAll { $0.directory == sessionDir }
         queue.append(Job(directory: sessionDir, choice: choice))
+        publishProgress()
         drainIfIdle()
     }
 
@@ -163,7 +166,15 @@ actor TranscriptionCoordinator {
             let job = queue.removeFirst()
             let dir = job.directory
             activeDirectory = dir
-            publish(.transcribing(session: dir.lastPathComponent, queued: queue.count))
+            progress = TranscriptionProgress(
+                session: dir.lastPathComponent,
+                modelTitle: job.choice?.title ?? LocalTranscriptionModel.selected.title,
+                isRetranscription: job.choice != nil,
+                startedAt: Date(),
+                stage: .loadingModel,
+                queued: queue.count
+            )
+            publishProgress()
             do {
                 try await transcribe(dir, choice: job.choice)
                 notifyUser(title: "Scribe — transcript ready", body: dir.lastPathComponent)
@@ -177,6 +188,7 @@ actor TranscriptionCoordinator {
             }
         }
         activeDirectory = nil
+        progress = nil
         await releaseEngine()
         publish(lastFailure.map { .failed(session: $0) } ?? .idle)
         draining = false
@@ -189,15 +201,18 @@ actor TranscriptionCoordinator {
         log(dir, choice.map { "transcribing again with \($0.model.rawValue) (\($0.language.rawValue)) — loading local model" }
             ?? "starting transcription — loading local model")
         let meta = try SessionMeta.read(from: dir)
+        setStage(.loadingModel)
         let engine = try await preparedEngine(for: choice)
 
         var merged: [Transcript.Segment] = []
-        for track in meta.tracks {
+        let tracks = meta.tracks.filter { track in
+            let present = FileManager.default.fileExists(atPath: dir.appendingPathComponent(track.file).path)
+            if !present { log(dir, "skipping missing track \(track.file)") }
+            return present
+        }
+        for (index, track) in tracks.enumerated() {
             let audio = dir.appendingPathComponent(track.file)
-            guard FileManager.default.fileExists(atPath: audio.path) else {
-                log(dir, "skipping missing track \(track.file)")
-                continue
-            }
+            setStage(.transcribingTrack(speaker: track.speaker, index: index + 1, count: tracks.count))
             log(dir, "transcribing \(track.file) (\(engine.name))")
             // One bad track (empty, truncated) shouldn't cost us the other's
             // transcript — log it and keep going.
@@ -236,6 +251,7 @@ actor TranscriptionCoordinator {
         }
         try transcript.writeMarkdown(to: dir)
         if choice == nil {
+            setStage(.writingNotes)
             let markdown = try String(
                 contentsOf: dir.appendingPathComponent("transcript.md"),
                 encoding: .utf8
@@ -278,6 +294,18 @@ actor TranscriptionCoordinator {
         } else {
             try? Data(line.utf8).write(to: url)
         }
+    }
+
+    private func setStage(_ stage: TranscriptionProgress.Stage) {
+        progress?.stage = stage
+        publishProgress()
+    }
+
+    private func publishProgress() {
+        guard var progress else { return }
+        progress.queued = queue.count
+        self.progress = progress
+        publish(.transcribing(progress))
     }
 
     private func publish(_ status: Status) {
