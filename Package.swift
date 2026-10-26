@@ -11,6 +11,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.7.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.4"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "1.1.0"),
     ],
     targets: [
         .executableTarget(
@@ -19,6 +20,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "WhisperKit", package: "WhisperKit"),
             ],
             exclude: ["Info.plist", "Scribe.entitlements"],
             linkerSettings: [
@@ -40,7 +42,10 @@ let package = Package(
         ),
         .testTarget(
             name: "ScribeTests",
-            dependencies: ["Scribe"]
+            dependencies: [
+                "Scribe",
+                .product(name: "WhisperKit", package: "WhisperKit"),
+            ]
         ),
     ]
 )

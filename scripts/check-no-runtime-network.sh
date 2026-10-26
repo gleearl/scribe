@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-forbidden='URLSession|URLSessionTask|NWConnection|import[[:space:]]+Network|CFNetwork|downloadAndLoad|ModelHub\.download|AsrModels\.download|https?://'
+forbidden='URLSession|URLSessionTask|NWConnection|import[[:space:]]+Network|CFNetwork|downloadAndLoad|ModelHub\.download|AsrModels\.download|WhisperKit\.download|https?://'
 
 matches="$({ grep -EnR --include='*.swift' "$forbidden" Sources/Scribe || true; } \
     | grep -v '^Sources/Scribe/CLI/ModelsCommand.swift:' \

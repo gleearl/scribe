@@ -22,7 +22,7 @@ actor TranscriptionCoordinator {
     private var statusHandler: (@Sendable (Status) -> Void)?
     private let makeEngine: @Sendable () -> any TranscriptionEngine
 
-    init(makeEngine: @escaping @Sendable () -> any TranscriptionEngine = { ParakeetEngine() }) {
+    init(makeEngine: @escaping @Sendable () -> any TranscriptionEngine = { LocalTranscriptionModel.selected.makeEngine() }) {
         self.makeEngine = makeEngine
     }
 
@@ -201,12 +201,12 @@ actor TranscriptionCoordinator {
     private func preparedEngine() async throws -> TranscriptionEngine {
         if let engine { return engine }
         let configured = Config.transcriptionEngine()
-        if configured != "parakeet" {
+        let engine = makeEngine()
+        if configured != engine.name {
             FileHandle.standardError.write(Data(
-                "warning: unknown transcription engine \"\(configured)\" — using parakeet\n".utf8
+                "warning: transcription engine \"\(configured)\" does not match the selected model — using \(engine.name)\n".utf8
             ))
         }
-        let engine = makeEngine()
         try await engine.prepare()
         self.engine = engine
         return engine

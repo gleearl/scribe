@@ -141,6 +141,16 @@ explicitly from Terminal:
 scribe models download-transcription --model parakeet-v2
 ```
 
+For Tagalog, Filipino, and Taglish meetings, choose **Whisper Filipino**, which
+is Whisper large-v3 turbo running locally through WhisperKit. When it is
+selected, Settings shows a **Spoken language** choice: Filipino (the default),
+English, or Detect automatically. Whisper is slower than Parakeet and less
+accurate on English-only meetings.
+
+```sh
+scribe models download-transcription --model whisper-large-v3-turbo
+```
+
 Normal recording and transcription make no network requests. The transcript is
 available without any AI connection. Summaries, decisions, action items, and
 open questions remain unavailable until you connect an optional locally
@@ -200,6 +210,10 @@ Preferences are written to `~/.config/scribe/config.json`.
   }
 }
 ```
+
+For Filipino transcription, set `"engine": "whisper"`,
+`"model": "whisper-large-v3-turbo"`, and `"language"` to `"tl"`, `"en"`, or
+`"auto"`.
 
 Set `prompt_for_calls` to `false` if you want Scribe to wait quietly for you to
 press Record. This setting never enables automatic recording.

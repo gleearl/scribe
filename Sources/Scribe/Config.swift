@@ -21,6 +21,8 @@ struct ScribeConfiguration: Codable, Equatable, Sendable {
         var enabled: Bool? = nil
         var engine: String? = nil
         var model: String? = nil
+        /// Whisper language code ("tl", "en") or "auto". Parakeet ignores it.
+        var language: String? = nil
     }
 
     struct Summarization: Codable, Equatable, Sendable {
@@ -131,6 +133,10 @@ enum Config {
 
     static func transcriptionModelID() -> String {
         load()?.transcription?.model ?? LocalTranscriptionModel.english.rawValue
+    }
+
+    static func transcriptionLanguage() -> String? {
+        load()?.transcription?.language
     }
 
     static func micVoiceProcessing() -> Bool {

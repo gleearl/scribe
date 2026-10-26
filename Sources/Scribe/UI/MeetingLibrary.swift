@@ -666,6 +666,7 @@ final class ScribeAppModel: ObservableObject {
     @Published private(set) var noteStyle: MeetingNoteStyle
     @Published private(set) var appearance: ScribeAppearance
     @Published private(set) var transcriptionModel: LocalTranscriptionModel
+    @Published private(set) var transcriptionLanguage: TranscriptionLanguage
     @Published private(set) var aiSettings: ScribeAISettings
     @Published var downloadingModelID: String?
 
@@ -691,6 +692,7 @@ final class ScribeAppModel: ObservableObject {
         noteStyle = Config.noteStyle()
         appearance = Config.appearance()
         transcriptionModel = .selected
+        transcriptionLanguage = .selected
         aiSettings = Config.aiSettings()
         showOnboarding = !demo && !UserDefaults.standard.bool(forKey: "scribe.onboarding.complete")
         refresh()
@@ -1134,8 +1136,17 @@ final class ScribeAppModel: ObservableObject {
         persist {
             var value = $0.transcription ?? .init()
             value.enabled = value.enabled ?? true
-            value.engine = "parakeet"
+            value.engine = selected.engineName
             value.model = selected.rawValue
+            $0.transcription = value
+        }
+    }
+
+    func setTranscriptionLanguage(_ language: TranscriptionLanguage) {
+        transcriptionLanguage = language
+        persist {
+            var value = $0.transcription ?? .init()
+            value.language = language.rawValue
             $0.transcription = value
         }
     }

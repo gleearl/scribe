@@ -149,7 +149,7 @@ final class AudioSetupTest: ObservableObject {
         Task {
             do {
                 let selectedModel = LocalTranscriptionModel.selected
-                let engine = ParakeetEngine(model: selectedModel)
+                let engine = selectedModel.makeEngine()
                 try await engine.prepare()
                 let lines: [TranscriptSegment]
                 do {

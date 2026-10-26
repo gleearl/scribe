@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add Whisper Filipino, a local transcription model for Tagalog, Filipino, and
+  Taglish meetings, with a Spoken language choice (Filipino, English, or
+  automatic detection). Download it from Settings → Models or with
+  `scribe models download-transcription --model whisper-large-v3-turbo`.
 - Add "Hide Dock icon when window is closed" to Settings (off by default). When
   on, closing the main window leaves Scribe in the menu bar only, with no Dock
   icon or Cmd-Tab entry, and opening the window again brings the Dock icon back.
