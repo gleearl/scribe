@@ -31,7 +31,9 @@ jobs:
         run: |
           codesign -d --entitlements - dist/Scribe.app 2>&1 | grep -q com.apple.security.device.audio-input
           codesign -d --entitlements - dist/Scribe.app 2>&1 | grep -q com.apple.security.personal-information.calendars
+      - name: Zip app bundle
+        run: ditto -c -k --keepParent dist/Scribe.app dist/Scribe.zip
       - uses: actions/upload-artifact@v7
         with:
           name: Scribe-macOS
-          path: dist/Scribe.app
+          path: dist/Scribe.zip
