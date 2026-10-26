@@ -37,7 +37,9 @@ final class ScribeWindowController: NSWindowController, NSWindowDelegate, NSAppl
         if wasInBackground {
             // AppKit can leave the main menu unresponsive when an app
             // activates in the same turn it leaves accessory mode.
-            DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { NSApp.activate(ignoringOtherApps: true) }
+            }
         } else {
             NSApp.activate(ignoringOtherApps: true)
         }
