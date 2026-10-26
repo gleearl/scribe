@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
-import WhisperKit
+// WhisperKit predates Sendable; the engine actor owns its instance exclusively.
+@preconcurrency import WhisperKit
 
 /// Where Scribe keeps its WhisperKit model and tokenizer. Both are fetched
 /// together by `scribe models download-transcription` so runtime
